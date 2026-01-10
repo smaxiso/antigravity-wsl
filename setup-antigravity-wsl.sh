@@ -1,0 +1,187 @@
+#!/bin/bash
+###############################################################################
+# Antigravity WSL Setup Script
+# 
+# Automates the setup of Google Antigravity to work seamlessly with WSL.
+# Run this from your WSL terminal: bash setup-antigravity-wsl.sh
+#
+# What it does:
+# 1. Creates 'agy' symlink for launching Antigravity from WSL
+# 2. Patches Antigravity config to use correct WSL extension
+# 3. Copies helper scripts from VS Code to Antigravity
+# 4. Enables mirrored networking for browser subagent
+#
+# Author: Sumit Kumar (smaxiso)
+# Blog: https://smaxiso.web.app/blog/google-antigravity-wsl-guide
+# GitHub: https://github.com/smaxiso
+# License: MIT
+###############################################################################
+
+set -e  # Exit on error
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}  Antigravity WSL Setup Script${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+
+# Detect Windows username
+echo -e "${YELLOW}[1/5] Detecting Windows username...${NC}"
+WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
+
+if [ -z "$WIN_USER" ]; then
+    echo -e "${RED}❌ Could not detect Windows username${NC}"
+    echo "Please run this script from WSL terminal"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Detected Windows user: $WIN_USER${NC}"
+echo ""
+
+# Define paths
+ANTIGRAVITY_BIN="/mnt/c/Users/$WIN_USER/AppData/Local/Programs/Antigravity/bin/antigravity"
+ANTIGRAVITY_SCRIPTS="/mnt/c/Users/$WIN_USER/AppData/Local/Programs/Antigravity/resources/app/extensions/antigravity-remote-wsl/scripts"
+VSCODE_EXTENSIONS="/mnt/c/Users/$WIN_USER/.vscode/extensions"
+WSLCONFIG="/mnt/c/Users/$WIN_USER/.wslconfig"
+LOCAL_BIN="$HOME/.local/bin"
+
+# Step 1: Create symlink
+echo -e "${YELLOW}[2/5] Creating 'agy' symlink...${NC}"
+
+if [ ! -f "$ANTIGRAVITY_BIN" ]; then
+    echo -e "${RED}❌ Antigravity not found at: $ANTIGRAVITY_BIN${NC}"
+    echo "Please install Antigravity first"
+    exit 1
+fi
+
+# Create ~/.local/bin if it doesn't exist
+mkdir -p "$LOCAL_BIN"
+
+# Create symlink
+ln -sf "$ANTIGRAVITY_BIN" "$LOCAL_BIN/agy"
+
+# Check if ~/.local/bin is in PATH
+if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
+    echo -e "${YELLOW}⚠️  ~/.local/bin is not in your PATH${NC}"
+    echo "Add this to your ~/.bashrc or ~/.zshrc:"
+    echo -e "${BLUE}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
+fi
+
+echo -e "${GREEN}✓ Symlink created: agy -> Antigravity${NC}"
+echo ""
+
+# Step 2: Patch Antigravity config
+echo -e "${YELLOW}[3/5] Patching Antigravity config...${NC}"
+
+if [ ! -f "$ANTIGRAVITY_BIN" ]; then
+    echo -e "${RED}❌ Config file not found${NC}"
+    exit 1
+fi
+
+# Check if already patched
+if grep -q 'WSL_EXT_ID="google.antigravity-remote-wsl"' "$ANTIGRAVITY_BIN" 2>/dev/null; then
+    echo -e "${GREEN}✓ Already patched (google.antigravity-remote-wsl)${NC}"
+else
+    # Create backup
+    cp "$ANTIGRAVITY_BIN" "${ANTIGRAVITY_BIN}.backup"
+    
+    # Patch the file (replace MS extension with Google's)
+    sed -i 's/WSL_EXT_ID="ms-vscode-remote.remote-wsl"/WSL_EXT_ID="google.antigravity-remote-wsl"/' "$ANTIGRAVITY_BIN"
+    
+    # Verify patch
+    if grep -q 'WSL_EXT_ID="google.antigravity-remote-wsl"' "$ANTIGRAVITY_BIN"; then
+        echo -e "${GREEN}✓ Config patched successfully${NC}"
+        echo -e "  Backup saved: ${ANTIGRAVITY_BIN}.backup"
+    else
+        echo -e "${RED}❌ Patch failed${NC}"
+        echo "Manual edit required at: $ANTIGRAVITY_BIN"
+    fi
+fi
+echo ""
+
+# Step 3: Copy helper scripts
+echo -e "${YELLOW}[4/5] Copying helper scripts from VS Code...${NC}"
+
+# Find latest VS Code WSL extension
+VSCODE_WSL_EXT=$(find "$VSCODE_EXTENSIONS" -maxdepth 1 -name "ms-vscode-remote.remote-wsl-*" -type d | sort -V | tail -n 1)
+
+if [ -z "$VSCODE_WSL_EXT" ]; then
+    echo -e "${YELLOW}⚠️  VS Code WSL extension not found${NC}"
+    echo "Install VS Code with WSL extension first, or skip this step"
+else
+    SOURCE_SCRIPTS="$VSCODE_WSL_EXT/scripts"
+    
+    if [ -d "$SOURCE_SCRIPTS" ]; then
+        # Create destination directory if it doesn't exist
+        mkdir -p "$ANTIGRAVITY_SCRIPTS"
+        
+        # Copy scripts
+        cp -r "$SOURCE_SCRIPTS"/* "$ANTIGRAVITY_SCRIPTS/" 2>/dev/null || true
+        
+        echo -e "${GREEN}✓ Helper scripts copied${NC}"
+        echo -e "  From: $(basename "$VSCODE_WSL_EXT")"
+        echo -e "  To: antigravity-remote-wsl/scripts/"
+    else
+        echo -e "${YELLOW}⚠️  Scripts directory not found in VS Code extension${NC}"
+    fi
+fi
+echo ""
+
+# Step 4: Setup mirrored networking
+echo -e "${YELLOW}[5/5] Configuring mirrored networking...${NC}"
+
+if [ -f "$WSLCONFIG" ]; then
+    # Check if already configured
+    if grep -q "networkingMode=mirrored" "$WSLCONFIG" 2>/dev/null; then
+        echo -e "${GREEN}✓ Mirrored networking already enabled${NC}"
+    else
+        # Backup existing config
+        cp "$WSLCONFIG" "${WSLCONFIG}.backup"
+        
+        # Add mirrored networking (append if [wsl2] section exists, create if not)
+        if grep -q "\[wsl2\]" "$WSLCONFIG"; then
+            # Add under [wsl2] section
+            sed -i '/\[wsl2\]/a networkingMode=mirrored' "$WSLCONFIG"
+        else
+            # Create [wsl2] section
+            echo -e "\n[wsl2]\nnetworkingMode=mirrored" >> "$WSLCONFIG"
+        fi
+        
+        echo -e "${GREEN}✓ Mirrored networking enabled${NC}"
+        echo -e "  Backup saved: ${WSLCONFIG}.backup"
+    fi
+else
+    # Create new .wslconfig
+    cat > "$WSLCONFIG" << 'EOF'
+[wsl2]
+networkingMode=mirrored
+EOF
+    echo -e "${GREEN}✓ Created .wslconfig with mirrored networking${NC}"
+fi
+
+echo ""
+echo -e "${BLUE}========================================${NC}"
+echo -e "${GREEN}✓ Setup Complete!${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+echo -e "${YELLOW}Next steps:${NC}"
+echo "1. Restart WSL: Run ${BLUE}wsl --shutdown${NC} in PowerShell, then reopen WSL"
+echo "2. Test the setup: Run ${BLUE}agy .${NC} from any project directory"
+echo ""
+echo -e "${YELLOW}Troubleshooting:${NC}"
+echo "• If 'agy' command not found, add to PATH (see message above)"
+echo "• If browser subagent fails, manually install Chrome extension"
+echo "• After Antigravity updates, re-run this script"
+echo ""
+echo -e "${BLUE}────────────────────────────────────────${NC}"
+echo -e "📝 Full guide: ${BLUE}https://smaxiso.web.app/blog/google-antigravity-wsl-guide${NC}"
+echo -e "👤 Created by: ${BLUE}Sumit Kumar (@smaxiso)${NC}"
+echo -e "${BLUE}────────────────────────────────────────${NC}"
+echo ""
+echo -e "${GREEN}Happy coding! 🚀${NC}"
