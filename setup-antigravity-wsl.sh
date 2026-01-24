@@ -33,7 +33,10 @@ echo ""
 
 # Detect Windows username
 echo -e "${YELLOW}[1/5] Detecting Windows username...${NC}"
+# Change to C: drive to avoid "CMD.EXE does not support UNC paths" warning
+pushd /mnt/c > /dev/null
 WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
+popd > /dev/null
 
 if [ -z "$WIN_USER" ]; then
     echo -e "${RED}❌ Could not detect Windows username${NC}"
@@ -84,23 +87,45 @@ if [ ! -f "$ANTIGRAVITY_BIN" ]; then
     exit 1
 fi
 
+if [ ! -w "$ANTIGRAVITY_BIN" ]; then
+    echo -e "${RED}❌ Config file is not writable${NC}"
+    echo "Please check permissions for: $ANTIGRAVITY_BIN"
+    exit 1
+fi
+
 # Check if already patched
 if grep -q 'WSL_EXT_ID="google.antigravity-remote-wsl"' "$ANTIGRAVITY_BIN" 2>/dev/null; then
     echo -e "${GREEN}✓ Already patched (google.antigravity-remote-wsl)${NC}"
 else
-    # Create backup
-    cp "$ANTIGRAVITY_BIN" "${ANTIGRAVITY_BIN}.backup"
-    
-    # Patch the file (replace MS extension with Google's)
-    sed -i 's/WSL_EXT_ID="ms-vscode-remote.remote-wsl"/WSL_EXT_ID="google.antigravity-remote-wsl"/' "$ANTIGRAVITY_BIN"
-    
-    # Verify patch
-    if grep -q 'WSL_EXT_ID="google.antigravity-remote-wsl"' "$ANTIGRAVITY_BIN"; then
-        echo -e "${GREEN}✓ Config patched successfully${NC}"
-        echo -e "  Backup saved: ${ANTIGRAVITY_BIN}.backup"
+    # Check if the target string exists
+    if grep -q 'WSL_EXT_ID="ms-vscode-remote.remote-wsl"' "$ANTIGRAVITY_BIN"; then
+        # Create backup
+        cp "$ANTIGRAVITY_BIN" "${ANTIGRAVITY_BIN}.backup"
+        
+        # Patch the file (replace MS extension with Google's)
+        # We use a temp file to avoid potential sed in-place issues on /mnt mounts
+        sed 's/WSL_EXT_ID="ms-vscode-remote.remote-wsl"/WSL_EXT_ID="google.antigravity-remote-wsl"/' "$ANTIGRAVITY_BIN" > "${ANTIGRAVITY_BIN}.tmp"
+        
+        if [ -s "${ANTIGRAVITY_BIN}.tmp" ]; then
+             mv "${ANTIGRAVITY_BIN}.tmp" "$ANTIGRAVITY_BIN"
+             
+             # Verify patch
+            if grep -q 'WSL_EXT_ID="google.antigravity-remote-wsl"' "$ANTIGRAVITY_BIN"; then
+                echo -e "${GREEN}✓ Config patched successfully${NC}"
+                echo -e "  Backup saved: ${ANTIGRAVITY_BIN}.backup"
+            else
+                echo -e "${RED}❌ Patch verification failed${NC}"
+                echo "Please check content of: $ANTIGRAVITY_BIN"
+            fi
+        else
+            echo -e "${RED}❌ Failed to create patched file${NC}"
+            rm -f "${ANTIGRAVITY_BIN}.tmp"
+        fi
     else
-        echo -e "${RED}❌ Patch failed${NC}"
-        echo "Manual edit required at: $ANTIGRAVITY_BIN"
+        echo -e "${RED}❌ Target configuration not found${NC}"
+        echo "Could not find 'WSL_EXT_ID=\"ms-vscode-remote.remote-wsl\"' in config file."
+        echo "The file format may have changed."
+        exit 1
     fi
 fi
 echo ""
