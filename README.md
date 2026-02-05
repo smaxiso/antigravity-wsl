@@ -34,6 +34,7 @@ The script automatically:
 ## 🔧 Features
 
 - **Auto-detection** - Finds your Windows username automatically
+- **Self-Healing** - Includes `antigravity-repair` tool to fix broken setups automatically
 - **Idempotent** - Safe to run multiple times
 - **Backups** - Creates `.backup` files before modifying
 - **Validation** - Checks prerequisites and verifies patches
@@ -49,41 +50,61 @@ The script automatically:
 
 For a detailed step-by-step guide with explanations, see my blog post:
 
-**[Getting Google Antigravity to Work with WSL on Windows](https://smaxiso.web.app/blog/google-antigravity-wsl-guide)**
+**[How I Got Google Antigravity Working Perfectly with WSL](https://smaxiso.web.app/blog/google-antigravity-wsl-guide)**
 
 The blog covers:
 - Why this setup is needed
 - What each step does
-- Troubleshooting common issues
-- Alternative methods if the script doesn't work
+- Detailed troubleshooting logs
+
+## 🔄 Updates & Maintenance
+
+### Setup broke after update? (Repair Tool)
+Antigravity updates often break the WSL server or revert configuration changes. We've included a repair tool specifically for this.
+
+If you see errors like:
+> `remote-cli/antigravity: not found`
+> `Remote Extension host terminated unexpectedly`
+
+Run the repair tool from your WSL terminal:
+```bash
+antigravity-repair
+```
+Then restart WSL (`wsl --shutdown`) and try again.
+
+### Re-running the Setup
+The main setup script is also safe to re-run at any time to re-apply patches:
+```bash
+./setup-antigravity-wsl.sh
+```
 
 ## 🐛 Troubleshooting
 
+**"No Internet Connection in WSL"**
+If Antigravity can't download the server, or `curl`/`git` fails, your WSL DNS is likely broken.
+1. Check `/etc/resolv.conf`. If it has a dynamic address, replace it with Google DNS:
+   ```bash
+   # Temporary fix
+   sudo bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
+   ```
+2. See the [blog post](https://smaxiso.web.app/blog/google-antigravity-wsl-guide) for the permanent fix involving `/etc/wsl.conf`.
+
+**"Download Error" for Browser Extension**
+If the browser subagent fails with a generic error, strictly follow these steps:
+1. Manually install the [Antigravity Chrome Extension](https://chromewebstore.google.com/detail/antigravity-browser-exten/eeijfnjmjelapkebgockoeaadonbchdd).
+2. Ensure `.wslconfig` has `networkingMode=mirrored`.
+3. Restart WSL.
+
 **"agy command not found"**
-- Add `~/.local/bin` to your PATH:
+- Add `~/.local-bin` to your PATH:
   ```bash
   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
   source ~/.bashrc
   ```
 
-**"Antigravity not found"**
-- Make sure Antigravity is installed on Windows
-- Check the installation path: `C:\Users\<USERNAME>\AppData\Local\Programs\Antigravity`
-
-**"Browser subagent fails"**
-- Manually install the [Antigravity Chrome Extension](https://chromewebstore.google.com/detail/antigravity-browser-exten/eeijfnjmjelapkebgockoeaadonbchdd)
-- Verify mirrored networking is enabled in `.wslconfig`
-
-**"Setup broke after Antigravity update"**
-- Simply re-run the script - it's idempotent and will re-apply all patches
-
-## 🔄 After Antigravity Updates
-
-Google Antigravity updates may overwrite the patched configuration. If your setup stops working after an update, just re-run the script:
-
-```bash
-./setup-antigravity-wsl.sh
-```
+**"Exec format error"**
+- This usually means you have a broken symlink pointing directly to the .exe instead of the wrapper script.
+- Run `./setup-antigravity-wsl.sh` again to fix it automatically.
 
 ## 📜 License
 

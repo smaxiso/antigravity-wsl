@@ -32,7 +32,7 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 
 # Detect Windows username
-echo -e "${YELLOW}[1/5] Detecting Windows username...${NC}"
+echo -e "${YELLOW}[1/6] Detecting Windows username...${NC}"
 # Change to C: drive to avoid "CMD.EXE does not support UNC paths" warning
 pushd /mnt/c > /dev/null
 WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
@@ -55,7 +55,7 @@ WSLCONFIG="/mnt/c/Users/$WIN_USER/.wslconfig"
 LOCAL_BIN="$HOME/.local/bin"
 
 # Step 1: Create symlink
-echo -e "${YELLOW}[2/5] Creating 'agy' symlink...${NC}"
+echo -e "${YELLOW}[2/6] Creating 'agy' symlink...${NC}"
 
 if [ ! -f "$ANTIGRAVITY_BIN" ]; then
     echo -e "${RED}❌ Antigravity not found at: $ANTIGRAVITY_BIN${NC}"
@@ -80,7 +80,7 @@ echo -e "${GREEN}✓ Symlink created: agy -> Antigravity${NC}"
 echo ""
 
 # Step 2: Patch Antigravity config
-echo -e "${YELLOW}[3/5] Patching Antigravity config...${NC}"
+echo -e "${YELLOW}[3/6] Patching Antigravity config...${NC}"
 
 if [ ! -f "$ANTIGRAVITY_BIN" ]; then
     echo -e "${RED}❌ Config file not found${NC}"
@@ -131,7 +131,7 @@ fi
 echo ""
 
 # Step 3: Copy helper scripts
-echo -e "${YELLOW}[4/5] Copying helper scripts from VS Code...${NC}"
+echo -e "${YELLOW}[4/6] Copying helper scripts from VS Code...${NC}"
 
 # Find latest VS Code WSL extension
 VSCODE_WSL_EXT=$(find "$VSCODE_EXTENSIONS" -maxdepth 1 -name "ms-vscode-remote.remote-wsl-*" -type d | sort -V | tail -n 1)
@@ -158,8 +158,20 @@ else
 fi
 echo ""
 
-# Step 4: Setup mirrored networking
-echo -e "${YELLOW}[5/5] Configuring mirrored networking...${NC}"
+# Step 4: Install repair tool
+echo -e "${YELLOW}[5/6] Installing repair tool (antigravity-repair)...${NC}"
+
+echo "⬇️ Installing auto-repair script..."
+mkdir -p ~/.local/bin
+curl -sL https://raw.githubusercontent.com/smaxiso/antigravity-wsl/master/antigravity-repair.sh -o ~/.local/bin/antigravity-repair
+chmod +x ~/.local/bin/antigravity-repair
+
+echo "✅ Done! 'antigravity-repair' is now installed."
+echo "👉 If 'agy' ever breaks after an update, just run: antigravity-repair"
+echo ""
+
+# Step 5: Setup mirrored networking
+echo -e "${YELLOW}[6/6] Configuring mirrored networking...${NC}"
 
 if [ -f "$WSLCONFIG" ]; then
     # Check if already configured
