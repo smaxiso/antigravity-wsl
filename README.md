@@ -59,12 +59,13 @@ The blog covers:
 
 ## 🔄 Updates & Maintenance
 
-### Setup broke after update? (Repair Tool)
-Antigravity updates often break the WSL server or revert configuration changes. We've included a repair tool specifically for this.
+### Setup broke or Fresh Install failed? (Repair Tool)
+Antigravity updates (or fresh installs) often fail to download the server, leaving behind broken `.tar.gz` files, or they revert configuration changes.
 
 If you see errors like:
 > `remote-cli/antigravity: not found`
 > `Remote Extension host terminated unexpectedly`
+> `ERROR 404: Not Found ... failed to download ... .tar.gz`
 
 Run the repair tool from your WSL terminal:
 ```bash

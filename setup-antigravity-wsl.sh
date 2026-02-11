@@ -163,7 +163,11 @@ echo -e "${YELLOW}[5/6] Installing repair tool (antigravity-repair)...${NC}"
 
 echo "⬇️ Installing auto-repair script..."
 mkdir -p ~/.local/bin
+# Download
 curl -sL https://raw.githubusercontent.com/smaxiso/antigravity-wsl/master/antigravity-repair.sh -o ~/.local/bin/antigravity-repair
+# 🛡️ Safety: Strip Windows line endings (CRLF) just in case
+sed -i 's/\r$//' ~/.local/bin/antigravity-repair
+# Make executable
 chmod +x ~/.local/bin/antigravity-repair
 
 echo "✅ Done! 'antigravity-repair' is now installed."
