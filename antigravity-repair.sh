@@ -8,7 +8,7 @@ if [[ -z "$VS_COMMIT" ]]; then
     exit 1
 fi
 
-AG_BIN_DIR="$HOME/.antigravity-server/bin"
+AG_BIN_DIR="$HOME/.antigravity-ide-server/bin"
 mkdir -p "$AG_BIN_DIR"
 
 # 1. ALWAYS check for failed downloads (tarballs) FIRST.
@@ -20,10 +20,10 @@ if [[ -n "$FAILED_TAR" ]]; then
 
     echo "⚠️  Update detected! Found failed download artifact: $FILENAME"
     echo "🧹 Cleaning up old server cache..."
-    
+
     # Delete old server directories to prevent update loops
     find "$AG_BIN_DIR" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
-    
+
     echo "🔨 Force-creating directory for new commit: $RECOVERED_COMMIT"
     mkdir -p "$AG_BIN_DIR/$RECOVERED_COMMIT"
 
@@ -62,10 +62,10 @@ for AG_BASE in $AG_DIRS; do
   # 2. Create structure
   mkdir -p "$AG_BASE/bin/remote-cli"
 
-  # 3. Link binaries
+  # 3. Link binaries to the updated antigravity-ide ecosystem identity
   ln -sf \
     "$HOME/.vscode-server/bin/$VS_COMMIT/bin/remote-cli/code" \
-    "$AG_BASE/bin/remote-cli/antigravity"
+    "$AG_BASE/bin/remote-cli/antigravity-ide"
 done
 
 echo ""

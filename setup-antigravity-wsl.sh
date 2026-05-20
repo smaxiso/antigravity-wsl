@@ -1,14 +1,14 @@
 #!/bin/bash
 ###############################################################################
-# Antigravity WSL Setup Script
-# 
-# Automates the setup of Google Antigravity to work seamlessly with WSL.
+# Antigravity IDE WSL Setup Script
+#
+# Automates the setup of Google Antigravity IDE to work seamlessly with WSL.
 # Run this from your WSL terminal: bash setup-antigravity-wsl.sh
 #
 # What it does:
-# 1. Creates 'agy' symlink for launching Antigravity from WSL
-# 2. Patches Antigravity config to use correct WSL extension
-# 3. Copies helper scripts from VS Code to Antigravity
+# 1. Creates 'agy' symlink for launching Antigravity IDE from WSL
+# 2. Patches Antigravity IDE config to use correct WSL extension
+# 3. Copies helper scripts from VS Code to Antigravity IDE
 # 4. Enables mirrored networking for browser subagent
 #
 # Author: Sumit Kumar (smaxiso)
@@ -27,46 +27,49 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  Antigravity WSL Setup Script${NC}"
+echo -e "${BLUE}  Antigravity IDE WSL Setup Script${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# Detect Windows username
-echo -e "${YELLOW}[1/6] Detecting Windows username...${NC}"
-# Change to C: drive to avoid "CMD.EXE does not support UNC paths" warning
-pushd /mnt/c > /dev/null
-WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
-popd > /dev/null
+# Detect Windows environment paths automatically
+echo -e "${YELLOW}[1/6] Detecting Windows environment paths...${NC}"
 
-if [ -z "$WIN_USER" ]; then
-    echo -e "${RED}❌ Could not detect Windows username${NC}"
-    echo "Please run this script from WSL terminal"
+WIN_LOCAL_APP=$(cmd.exe /c "echo %LOCALAPPDATA%" 2>/dev/null | tr -d '\r')
+WIN_USER_PROFILE=$(cmd.exe /c "echo %USERPROFILE%" 2>/dev/null | tr -d '\r')
+
+if [ -z "$WIN_LOCAL_APP" ] || [ -z "$WIN_USER_PROFILE" ]; then
+    echo -e "${RED}❌ Could not detect Windows environment paths${NC}"
+    echo "Please run this script from a standard WSL terminal"
     exit 1
 fi
 
-echo -e "${GREEN}✓ Detected Windows user: $WIN_USER${NC}"
+# Convert to native WSL mount paths
+LOCAL_APP_WSL=$(wslpath "$WIN_LOCAL_APP")
+USER_PROFILE_WSL=$(wslpath "$WIN_USER_PROFILE")
+
+echo -e "${GREEN}✓ Environment paths detected successfully${NC}"
 echo ""
 
-# Define paths
-ANTIGRAVITY_BIN="/mnt/c/Users/$WIN_USER/AppData/Local/Programs/Antigravity/bin/antigravity"
-ANTIGRAVITY_SCRIPTS="/mnt/c/Users/$WIN_USER/AppData/Local/Programs/Antigravity/resources/app/extensions/antigravity-remote-wsl/scripts"
-VSCODE_EXTENSIONS="/mnt/c/Users/$WIN_USER/.vscode/extensions"
-WSLCONFIG="/mnt/c/Users/$WIN_USER/.wslconfig"
+# Define paths for the new Antigravity IDE architecture
+ANTIGRAVITY_BIN="$LOCAL_APP_WSL/Programs/Antigravity IDE/bin/antigravity-ide"
+ANTIGRAVITY_SCRIPTS="$LOCAL_APP_WSL/Programs/Antigravity IDE/resources/app/extensions/antigravity-remote-wsl/scripts"
+VSCODE_EXTENSIONS="$USER_PROFILE_WSL/.vscode/extensions"
+WSLCONFIG="$USER_PROFILE_WSL/.wslconfig"
 LOCAL_BIN="$HOME/.local/bin"
 
 # Step 1: Create symlink
 echo -e "${YELLOW}[2/6] Creating 'agy' symlink...${NC}"
 
 if [ ! -f "$ANTIGRAVITY_BIN" ]; then
-    echo -e "${RED}❌ Antigravity not found at: $ANTIGRAVITY_BIN${NC}"
-    echo "Please install Antigravity first"
+    echo -e "${RED}❌ Antigravity IDE not found at: $ANTIGRAVITY_BIN${NC}"
+    echo "Please install Antigravity IDE first"
     exit 1
 fi
 
 # Create ~/.local/bin if it doesn't exist
 mkdir -p "$LOCAL_BIN"
 
-# Create symlink
+# Create symlink (Overwrite old ones safely)
 ln -sf "$ANTIGRAVITY_BIN" "$LOCAL_BIN/agy"
 
 # Check if ~/.local/bin is in PATH
@@ -76,11 +79,11 @@ if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
     echo -e "${BLUE}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
 fi
 
-echo -e "${GREEN}✓ Symlink created: agy -> Antigravity${NC}"
+echo -e "${GREEN}✓ Symlink created: agy -> Antigravity IDE${NC}"
 echo ""
 
 # Step 2: Patch Antigravity config
-echo -e "${YELLOW}[3/6] Patching Antigravity config...${NC}"
+echo -e "${YELLOW}[3/6] Patching Antigravity IDE config...${NC}"
 
 if [ ! -f "$ANTIGRAVITY_BIN" ]; then
     echo -e "${RED}❌ Config file not found${NC}"
@@ -101,15 +104,14 @@ else
     if grep -q 'WSL_EXT_ID="ms-vscode-remote.remote-wsl"' "$ANTIGRAVITY_BIN"; then
         # Create backup
         cp "$ANTIGRAVITY_BIN" "${ANTIGRAVITY_BIN}.backup"
-        
+
         # Patch the file (replace MS extension with Google's)
-        # We use a temp file to avoid potential sed in-place issues on /mnt mounts
         sed 's/WSL_EXT_ID="ms-vscode-remote.remote-wsl"/WSL_EXT_ID="google.antigravity-remote-wsl"/' "$ANTIGRAVITY_BIN" > "${ANTIGRAVITY_BIN}.tmp"
-        
+
         if [ -s "${ANTIGRAVITY_BIN}.tmp" ]; then
-             mv "${ANTIGRAVITY_BIN}.tmp" "$ANTIGRAVITY_BIN"
-             
-             # Verify patch
+            mv "${ANTIGRAVITY_BIN}.tmp" "$ANTIGRAVITY_BIN"
+
+            # Verify patch
             if grep -q 'WSL_EXT_ID="google.antigravity-remote-wsl"' "$ANTIGRAVITY_BIN"; then
                 echo -e "${GREEN}✓ Config patched successfully${NC}"
                 echo -e "  Backup saved: ${ANTIGRAVITY_BIN}.backup"
@@ -141,14 +143,14 @@ if [ -z "$VSCODE_WSL_EXT" ]; then
     echo "Install VS Code with WSL extension first, or skip this step"
 else
     SOURCE_SCRIPTS="$VSCODE_WSL_EXT/scripts"
-    
+
     if [ -d "$SOURCE_SCRIPTS" ]; then
         # Create destination directory if it doesn't exist
         mkdir -p "$ANTIGRAVITY_SCRIPTS"
-        
+
         # Copy scripts
         cp -r "$SOURCE_SCRIPTS"/* "$ANTIGRAVITY_SCRIPTS/" 2>/dev/null || true
-        
+
         echo -e "${GREEN}✓ Helper scripts copied${NC}"
         echo -e "  From: $(basename "$VSCODE_WSL_EXT")"
         echo -e "  To: antigravity-remote-wsl/scripts/"
@@ -184,7 +186,7 @@ if [ -f "$WSLCONFIG" ]; then
     else
         # Backup existing config
         cp "$WSLCONFIG" "${WSLCONFIG}.backup"
-        
+
         # Add mirrored networking (append if [wsl2] section exists, create if not)
         if grep -q "\[wsl2\]" "$WSLCONFIG"; then
             # Add under [wsl2] section
@@ -193,7 +195,7 @@ if [ -f "$WSLCONFIG" ]; then
             # Create [wsl2] section
             echo -e "\n[wsl2]\nnetworkingMode=mirrored" >> "$WSLCONFIG"
         fi
-        
+
         echo -e "${GREEN}✓ Mirrored networking enabled${NC}"
         echo -e "  Backup saved: ${WSLCONFIG}.backup"
     fi
@@ -218,7 +220,7 @@ echo ""
 echo -e "${YELLOW}Troubleshooting:${NC}"
 echo "• If 'agy' command not found, add to PATH (see message above)"
 echo "• If browser subagent fails, manually install Chrome extension"
-echo "• After Antigravity updates, re-run this script"
+echo "• After Antigravity IDE updates, re-run this script"
 echo ""
 echo -e "${BLUE}────────────────────────────────────────${NC}"
 echo -e "📝 Full guide: ${BLUE}https://smaxiso.web.app/blog/google-antigravity-wsl-guide${NC}"
